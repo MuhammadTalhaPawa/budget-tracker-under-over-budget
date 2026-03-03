@@ -9,7 +9,7 @@ Built with plain **HTML + CSS + JavaScript**. No frameworks, no installs, no bui
 ## 🌐 Live Demo
 
 > Hosted on GitHub Pages:  
-> `https://yourusername.github.io/budget-tracker`
+> `[https://yourusername.github.io/budget-tracker](https://muhammadtalhapawa.github.io/budget-tracker-under-over-budget/)`
 
 ---
 
