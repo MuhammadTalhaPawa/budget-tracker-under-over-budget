@@ -167,7 +167,12 @@
       .nav-ul{display:none}
     }
     @media(max-width:560px){.mst{grid-template-columns:1fr 1fr}.eg{grid-template-columns:1fr 1fr}}
+    /* 3D CANVAS */
+    #hero-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.85}
+    .hero{position:relative;overflow:hidden}
+    .hero>div{position:relative;z-index:1}
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
@@ -188,6 +193,7 @@
 <!-- HERO -->
 <section>
   <div class="hero">
+    <canvas id="hero-canvas"></canvas>
     <div>
       <div class="badge"><span class="bdot"></span>Free &middot; No signup &middot; Works offline</div>
       <h1>Know exactly where your <em>money stands</em> today</h1>
@@ -336,6 +342,128 @@
   calc();
   const obs=new IntersectionObserver((es)=>{es.forEach((e,i)=>{if(e.isIntersecting)setTimeout(()=>e.target.classList.add('vis'),i*80)})},{threshold:.1});
   document.querySelectorAll('.fu').forEach(el=>obs.observe(el));
+
+  // ── 3D Hero Object ──────────────────────────────────────────
+  (function(){
+    const canvas = document.getElementById('hero-canvas');
+    const heroEl = canvas.parentElement;
+    const W = () => heroEl.offsetWidth, H = () => heroEl.offsetHeight;
+
+    const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(W(), H());
+
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(45, W()/H(), 0.1, 100);
+    cam.position.set(0, 0, 5);
+
+    // Gold color
+    const GOLD = 0xd4a843;
+    const GOLD2 = 0xf0c96a;
+    const BLUE = 0x1e2840;
+
+    // ── Outer wireframe icosahedron ──
+    const icoGeo = new THREE.IcosahedronGeometry(1.7, 1);
+    const icoMat = new THREE.MeshBasicMaterial({color: GOLD, wireframe:true, transparent:true, opacity:.18});
+    const ico = new THREE.Mesh(icoGeo, icoMat);
+    scene.add(ico);
+
+    // ── Inner solid icosahedron (subtle) ──
+    const icoGeo2 = new THREE.IcosahedronGeometry(1.4, 1);
+    const icoMat2 = new THREE.MeshPhongMaterial({color:0x0d1119, emissive:0x0d1119, transparent:true, opacity:.6, wireframe:false});
+    const ico2 = new THREE.Mesh(icoGeo2, icoMat2);
+    scene.add(ico2);
+
+    // ── Glowing edge lines ──
+    const edgesGeo = new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(1.4, 1));
+    const edgesMat = new THREE.LineBasicMaterial({color: GOLD2, transparent:true, opacity:.55});
+    const edges = new THREE.LineSegments(edgesGeo, edgesMat);
+    scene.add(edges);
+
+    // ── Outer ring torus ──
+    const torusGeo = new THREE.TorusGeometry(2.2, 0.012, 6, 80);
+    const torusMat = new THREE.MeshBasicMaterial({color: GOLD, transparent:true, opacity:.25});
+    const torus = new THREE.Mesh(torusGeo, torusMat);
+    torus.rotation.x = Math.PI * 0.3;
+    scene.add(torus);
+
+    const torusGeo2 = new THREE.TorusGeometry(2.5, 0.008, 6, 80);
+    const torus2 = new THREE.Mesh(torusGeo2, new THREE.MeshBasicMaterial({color:GOLD, transparent:true, opacity:.12}));
+    torus2.rotation.x = Math.PI * 0.5;
+    torus2.rotation.y = Math.PI * 0.2;
+    scene.add(torus2);
+
+    // ── Floating particles ──
+    const ptCount = 120;
+    const ptPositions = new Float32Array(ptCount * 3);
+    for(let i=0;i<ptCount;i++){
+      const r = 2.2 + Math.random()*1.8;
+      const theta = Math.random()*Math.PI*2;
+      const phi = Math.acos(2*Math.random()-1);
+      ptPositions[i*3]   = r*Math.sin(phi)*Math.cos(theta);
+      ptPositions[i*3+1] = r*Math.sin(phi)*Math.sin(theta);
+      ptPositions[i*3+2] = r*Math.cos(phi);
+    }
+    const ptGeo = new THREE.BufferGeometry();
+    ptGeo.setAttribute('position', new THREE.BufferAttribute(ptPositions, 3));
+    const ptMat = new THREE.PointsMaterial({color: GOLD2, size:0.035, transparent:true, opacity:.7});
+    const points = new THREE.Points(ptGeo, ptMat);
+    scene.add(points);
+
+    // ── Lighting ──
+    const aLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(aLight);
+    const pLight = new THREE.PointLight(GOLD, 2.5, 10);
+    pLight.position.set(2, 2, 3);
+    scene.add(pLight);
+    const pLight2 = new THREE.PointLight(0x2ecc8a, 1.2, 8);
+    pLight2.position.set(-2, -1, 2);
+    scene.add(pLight2);
+
+    // ── Mouse parallax ──
+    let mx=0, my=0;
+    window.addEventListener('mousemove', e=>{
+      mx = (e.clientX/window.innerWidth  - .5) * 2;
+      my = (e.clientY/window.innerHeight - .5) * 2;
+    });
+
+    // ── Resize ──
+    window.addEventListener('resize', ()=>{
+      renderer.setSize(W(), H());
+      cam.aspect = W()/H();
+      cam.updateProjectionMatrix();
+    });
+
+    // ── Animate ──
+    let t=0;
+    function animate(){
+      requestAnimationFrame(animate);
+      t += 0.006;
+
+      ico.rotation.x  = t * 0.18 + my * 0.12;
+      ico.rotation.y  = t * 0.22 + mx * 0.12;
+      ico2.rotation.x = t * 0.18 + my * 0.12;
+      ico2.rotation.y = t * 0.22 + mx * 0.12;
+      edges.rotation.x = ico.rotation.x;
+      edges.rotation.y = ico.rotation.y;
+
+      torus.rotation.z  = t * 0.12;
+      torus.rotation.y  = mx * 0.08;
+      torus2.rotation.z = -t * 0.09;
+      torus2.rotation.x = Math.PI*0.5 + my * 0.06;
+
+      points.rotation.y = t * 0.04 + mx * 0.04;
+      points.rotation.x = my * 0.04;
+
+      // Pulse opacity
+      icoMat.opacity  = .14 + Math.sin(t*1.2) * .06;
+      edgesMat.opacity = .45 + Math.sin(t*0.9 + 1) * .15;
+
+      renderer.render(scene, cam);
+    }
+    animate();
+  })();
 </script>
 </body>
 </html>
